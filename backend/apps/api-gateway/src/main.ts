@@ -6,9 +6,12 @@ import { Request, Response } from 'express';
 
 async function bootstrap() {
   process.env.KAFKAJS_NO_PARTITIONER_WARNING = '1';
-  const app = await NestFactory.create(AppGatewayModule, {
-    logger: ['error', 'warn', 'log'], // Chỉ log error, warn, log (tắt verbose, debug)
-  });
+  let retries = 10;
+  while (retries > 0) {
+    try {
+      const app = await NestFactory.create(AppGatewayModule, {
+        logger: ['error', 'warn', 'log'], // Chỉ log error, warn, log (tắt verbose, debug)
+      });
 
   // Global Validation Pipe — tự động validate DTO bằng class-validator
   app.useGlobalPipes(
@@ -50,10 +53,18 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  const port = process.env.PORT || 4000;
-  await app.listen(port);
-  console.log(`\n🚀 API Gateway running at: http://localhost:${port}`);
-  console.log(`📚 Swagger Docs at:        http://localhost:${port}/api/docs\n`);
+      const port = process.env.PORT || 4000;
+      await app.listen(port);
+      console.log(`\n🚀 API Gateway running at: http://localhost:${port}`);
+      console.log(`📚 Swagger Docs at:        http://localhost:${port}/api/docs\n`);
+      break;
+    } catch (err) {
+      console.error(`❌ Lỗi khởi động API Gateway. Thử lại sau 5s... (${retries} lần thử còn lại)`, err);
+      retries--;
+      if (retries === 0) throw err;
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+  }
 }
 
 bootstrap();

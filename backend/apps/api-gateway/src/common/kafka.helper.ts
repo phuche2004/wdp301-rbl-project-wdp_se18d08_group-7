@@ -24,9 +24,11 @@ export async function subscribeToKafkaTopics(client: ClientKafka, topics: string
       const isLastAttempt = i === retries - 1;
       if (isLastAttempt) {
         console.error(`❌ Kafka client failed to connect to topics: ${topics.join(', ')} after ${retries} attempts.`, error);
+        try { await client.close(); } catch(e) {}
         throw error;
       }
-      // Đã loại bỏ console.warn để giảm log trong quá trình retry
+      // Xoá cache connection cũ để NestJS ClientKafka thử kết nối lại thực sự từ đầu
+      try { await client.close(); } catch(e) {}
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }

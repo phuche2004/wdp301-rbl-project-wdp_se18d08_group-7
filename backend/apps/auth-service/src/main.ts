@@ -7,12 +7,12 @@ import { AuthServiceAppModule } from './app.module';
 import { User, UserRole } from './auth/user.schema';
 
 async function bootstrap() {
-  /**
-   * Auth Service khởi động như một NestJS MICROSERVICE
-   * Không lắng nghe HTTP — chỉ lắng nghe message từ Kafka Broker
-   */
-  const app = await NestFactory.createMicroservice<MicroserviceOptions>(
-    AuthServiceAppModule,
+  process.env.KAFKAJS_NO_PARTITIONER_WARNING = '1';
+  let retries = 10;
+  while (retries > 0) {
+    try {
+      const app = await NestFactory.createMicroservice<MicroserviceOptions>(
+        AuthServiceAppModule,
     {
       transport: Transport.KAFKA,
       options: {
@@ -21,12 +21,14 @@ async function bootstrap() {
           brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
           connectionTimeout: 10000,
           retry: { initialRetryTime: 1000, retries: 10 },
+          logLevel: 1,
         },
         consumer: {
           // Consumer Group ID — tất cả các pod cùng group sẽ chia nhau xử lý message
           groupId: (process.env.KAFKA_GROUP_ID || 'wdp301-consumers') + '-auth',
         },
       },
+      logger: ['error', 'warn', 'log'],
     },
   );
 
@@ -55,14 +57,22 @@ async function bootstrap() {
   }
   // ---------------------------
 
-  await app.listen();
-  console.log('🚀 Auth Microservice đang lắng nghe Kafka trên localhost:9092');
-  console.log('📋 Các Topic đang lắng nghe:');
-  console.log('   ✅ auth.login              (Request-Response)');
-  console.log('   ✅ auth.register           (Request-Response)');
-  console.log('   ✅ auth.validate.token     (Request-Response)');
-  console.log('   ✅ auth.get.user.by.id     (Request-Response)');
-  console.log('   ✅ auth.event.logout       (Event-Driven)');
+      await app.listen();
+      console.log('🚀 Auth Microservice đang lắng nghe Kafka trên localhost:9092');
+      console.log('📋 Các Topic đang lắng nghe:');
+      console.log('   ✅ auth.login              (Request-Response)');
+      console.log('   ✅ auth.register           (Request-Response)');
+      console.log('   ✅ auth.validate.token     (Request-Response)');
+      console.log('   ✅ auth.get.user.by.id     (Request-Response)');
+      console.log('   ✅ auth.event.logout       (Event-Driven)');
+      break;
+    } catch (error) {
+      console.error(`❌ Lỗi khởi động Auth Service. Thử lại sau 5s... (${retries} lần thử còn lại)`);
+      retries--;
+      if (retries === 0) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+    }
+  }
 }
 
 bootstrap();
