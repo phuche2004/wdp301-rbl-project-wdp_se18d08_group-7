@@ -35,6 +35,7 @@ import { GoogleStrategy } from './strategies/google.strategy';
               brokers: (config.get<string>('KAFKA_BROKERS', 'localhost:9092')).split(','),
               connectionTimeout: 10000,
               retry: { initialRetryTime: 1000, retries: 10 },
+            logLevel: 1,
             },
             consumer: {
               groupId: 'api-gateway-group',
